@@ -2,55 +2,24 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Quick Quotes UK - Client Distance Map</title>
+<title>Quick Quotes UK - Client Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
-    html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        font-family: Arial, sans-serif;
-    }
-
-    #controls {
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1000;
-        background: white;
-        padding: 10px 15px;
-        border-radius: 8px;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-    }
-
-    #map {
-        width: 100%;
-        height: 100vh;
-    }
-
-    input {
-        padding: 6px;
-        font-size: 14px;
-    }
-
-    button {
-        padding: 6px 10px;
-        font-size: 14px;
-        cursor: pointer;
-    }
+html, body {
+    margin:0;
+    padding:0;
+    height:100%;
+}
+#map {
+    width:100%;
+    height:100vh;
+}
 </style>
 </head>
 <body>
-
-<div id="controls">
-    <input type="text" id="searchPostcode" placeholder="Enter collection postcode">
-    <button onclick="findNearest()">Find Nearest Client</button>
-    <span id="result"></span>
-</div>
 
 <div id="map"></div>
 
@@ -58,144 +27,58 @@
 
 <script>
 
-var map = L.map('map').setView([54.5, -3], 6);
+// Initializare harta
+var map = L.map('map').setView([54.5, -2.5], 6);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
 
-// CLIENT LIST
+// CLIENTI CU COORDONATE FIXE (centre aproximative postcode)
 var clients = [
-    {name: "ShipBob", postcode: "CV35 9JY"},
-    {name: "ShipBob", postcode: "OL10 2TT"},
-    {name: "AJVANI SHOES", postcode: "BL1 3DX"},
-    {name: "Belushi Ltd t/a Chalkys.comon", postcode: "OX16 3LU"},
-    {name: "Buscalibre", postcode: "RG24 8LJ"},
-    {name: "CPL Solutions Ltd", postcode: "BL1 2SE"},
-    {name: "DECIEM", postcode: "NG2 1AH"},
-    {name: "EDWARD BOWDITCH LTD", postcode: "TW4 6ER"},
-    {name: "eSalon", postcode: "W3 6UU"},
-    {name: "Exelot", postcode: "SL3 0BQ"},
-    {name: "FANATICS", postcode: "M24 2FL"},
-    {name: "Fishpond World Ltd", postcode: "GL3 4BH"},
-    {name: "FUNKO", postcode: "CV3 4PB"},
-    {name: "GAMES QUEST", postcode: "GU35 9HH"},
-    {name: "Love Honey", postcode: "BA1 3EN"},
-    {name: "Maniere de Voir Ltd", postcode: "WA3 6DF"},
-    {name: "Motel Rocks", postcode: "WR4 9FA"},
-    {name: "Pointbid", postcode: "B6 7JJ"},
-    {name: "Snag Tights", postcode: "EH54 9DF"},
-    {name: "T Shirt & Sons", postcode: "BA13 4JP"},
-    {name: "UNIVERSAL TEXTILES", postcode: "LE3 1HR"},
-    {name: "Wrap Distribution", postcode: "OX10 9TA"}
+
+{ name:"ShipBob", postcode:"CV35 9JY", lat:52.192, lng:-1.552 },
+{ name:"ShipBob", postcode:"OL10 2TT", lat:53.592, lng:-2.220 },
+{ name:"AJVANI SHOES", postcode:"BL1 3DX", lat:53.587, lng:-2.430 },
+{ name:"Belushi Ltd t/a Chalkys.comon", postcode:"OX16 3LU", lat:52.056, lng:-1.342 },
+{ name:"Buscalibre", postcode:"RG24 8LJ", lat:51.280, lng:-1.090 },
+{ name:"CPL Solutions Ltd", postcode:"BL1 2SE", lat:53.580, lng:-2.435 },
+{ name:"DECIEM", postcode:"NG2 1AH", lat:52.940, lng:-1.132 },
+{ name:"EDWARD BOWDITCH LTD", postcode:"TW4 6ER", lat:51.468, lng:-0.385 },
+{ name:"eSalon", postcode:"W3 6UU", lat:51.511, lng:-0.267 },
+{ name:"Exelot", postcode:"SL3 0BQ", lat:51.495, lng:-0.507 },
+{ name:"FANATICS", postcode:"M24 2FL", lat:53.548, lng:-2.173 },
+{ name:"Fishpond World Ltd", postcode:"GL3 4BH", lat:51.864, lng:-2.146 },
+{ name:"FUNKO", postcode:"CV3 4PB", lat:52.391, lng:-1.470 },
+{ name:"GAMES QUEST", postcode:"GU35 9HH", lat:51.140, lng:-0.986 },
+{ name:"Love Honey", postcode:"BA1 3EN", lat:51.393, lng:-2.359 },
+{ name:"Maniere de Voir Ltd", postcode:"WA3 6DF", lat:53.458, lng:-2.548 },
+{ name:"Motel Rocks", postcode:"WR4 9FA", lat:52.207, lng:-2.180 },
+{ name:"Pointbid", postcode:"B6 7JJ", lat:52.516, lng:-1.884 },
+{ name:"Snag Tights", postcode:"EH54 9DF", lat:55.892, lng:-3.530 },
+{ name:"T Shirt & Sons", postcode:"BA13 4JP", lat:51.205, lng:-2.187 },
+{ name:"UNIVERSAL TEXTILES", postcode:"LE3 1HR", lat:52.636, lng:-1.168 },
+{ name:"Wrap Distribution", postcode:"OX10 9TA", lat:51.606, lng:-1.125 }
+
 ];
 
-var clientMarkers = [];
-var userMarker = null;
-var line = null;
 
+// Adaugare pinuri permanente
+clients.forEach(function(client){
 
-// GEOCODE FUNCTION
-async function geocode(postcode) {
-    const response = await fetch(
-        "https://nominatim.openstreetmap.org/search?format=json&country=UK&postalcode=" + postcode
+    var marker = L.marker([client.lat, client.lng]).addTo(map);
+
+    marker.bindTooltip(
+        "<b>" + client.name + "</b><br>" + client.postcode,
+        {
+            permanent: true,
+            direction: "top",
+            offset: [0,-10]
+        }
     );
-    const data = await response.json();
-    if (data.length > 0) {
-        return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-    }
-    return null;
-}
 
-
-// LOAD CLIENTS ON MAP
-async function loadClients() {
-    for (let client of clients) {
-        let coords = await geocode(client.postcode);
-        if (coords) {
-            client.latlng = coords;
-
-            let marker = L.circleMarker(coords, {
-                radius: 7,
-                fillColor: "#007bff",
-                color: "#fff",
-                weight: 1,
-                fillOpacity: 0.9
-            }).addTo(map);
-
-            marker.bindTooltip(
-                "<b>" + client.name + "</b><br>" + client.postcode,
-                { permanent: true, direction: "top" }
-            );
-
-            clientMarkers.push(marker);
-        }
-    }
-}
-
-loadClients();
-
-
-// DISTANCE CALCULATION (Haversine)
-function getDistance(lat1, lon1, lat2, lon2) {
-    var R = 6371;
-    var dLat = (lat2-lat1) * Math.PI/180;
-    var dLon = (lon2-lon1) * Math.PI/180;
-    var a =
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI/180) *
-        Math.cos(lat2 * Math.PI/180) *
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-
-// FIND NEAREST CLIENT
-async function findNearest() {
-
-    var postcode = document.getElementById("searchPostcode").value;
-    if (!postcode) return;
-
-    let userCoords = await geocode(postcode);
-    if (!userCoords) {
-        alert("Postcode not found");
-        return;
-    }
-
-    if (userMarker) map.removeLayer(userMarker);
-    if (line) map.removeLayer(line);
-
-    userMarker = L.marker(userCoords).addTo(map)
-        .bindTooltip("Collection: " + postcode, {permanent:true, direction:"bottom"});
-
-    var nearest = null;
-    var minDistance = 999999;
-
-    clients.forEach(client => {
-        if (client.latlng) {
-            let d = getDistance(
-                userCoords[0], userCoords[1],
-                client.latlng[0], client.latlng[1]
-            );
-            if (d < minDistance) {
-                minDistance = d;
-                nearest = client;
-            }
-        }
-    });
-
-    if (nearest) {
-        line = L.polyline([userCoords, nearest.latlng], {color: 'red'}).addTo(map);
-
-        document.getElementById("result").innerHTML =
-            "Nearest: <b>" + nearest.name + "</b> (" +
-            minDistance.toFixed(1) + " km)";
-    }
-
-    map.setView(userCoords, 8);
-}
+});
 
 </script>
 
