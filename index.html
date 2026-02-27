@@ -1,116 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Quick Quotes UK</title>
+    <meta charset="utf-8" />
+    <title>Quick Quotes UK - Client Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-<style>
-body{
-  font-family: Arial;
-  padding: 20px;
-  background: #f4f6fb;
-}
-input, select{
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-}
-button{
-  width: 100%;
-  padding: 12px;
-  background: #1d4ed8;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-}
-#map{
-  height: 300px;
-  margin-top: 20px;
-  border-radius: 12px;
-}
-</style>
+    <style>
+        body { margin:0; padding:0; }
+        #map { height: 100vh; }
+    </style>
 </head>
-
 <body>
 
-<h2>🚐 Quick Quotes UK</h2>
-
-<input id="pickup" placeholder="Pickup postcode or address">
-<input id="delivery" placeholder="Delivery postcode or address">
-
-<select id="vehicle">
-  <option value="1">SWB</option>
-  <option value="1.05">MWB</option>
-  <option value="1.1">LWB</option>
-  <option value="1.15">XLWB</option>
-  <option value="1.2">Luton</option>
-  <option value="2.4">7.5T</option>
-  <option value="2.5">18T</option>
-  <option value="3">Artic</option>
-</select>
-
-<button onclick="calculateQuote()">Calculate Quote</button>
-
-<h3 id="result"></h3>
 <div id="map"></div>
 
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <script>
-let map = L.map('map').setView([51.5,-0.12],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap'
+
+// Initializare hartă centrată pe UK
+var map = L.map('map').setView([54.5, -3], 6);
+
+// Tile layer OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-async function getCoords(address){
-  let url=`https://nominatim.openstreetmap.org/search?format=json&q=${address}`;
-  let res = await axios.get(url);
-  if(res.data.length>0){
-    return [res.data[0].lat,res.data[0].lon];
-  }
-  return null;
+
+// Lista clienti
+var clients = [
+    {name: "ShipBob", postcode: "CV35 9JY"},
+    {name: "ShipBob", postcode: "OL10 2TT"},
+    {name: "AJVANI SHOES", postcode: "BL1 3DX"},
+    {name: "Belushi Ltd t/a Chalkys.comon", postcode: "OX16 3LU"},
+    {name: "Buscalibre", postcode: "RG24 8LJ"},
+    {name: "CPL Solutions Ltd", postcode: "BL1 2SE"},
+    {name: "DECIEM", postcode: "NG2 1AH"},
+    {name: "EDWARD BOWDITCH LTD", postcode: "TW4 6ER"},
+    {name: "eSalon", postcode: "W3 6UU"},
+    {name: "Exelot", postcode: "SL3 0BQ"},
+    {name: "FANATICS", postcode: "M24 2FL"},
+    {name: "Fishpond World Ltd", postcode: "GL3 4BH"},
+    {name: "FUNKO", postcode: "CV3 4PB"},
+    {name: "GAMES QUEST", postcode: "GU35 9HH"},
+    {name: "Love Honey", postcode: "BA1 3EN"},
+    {name: "Maniere de Voir Ltd", postcode: "WA3 6DF"},
+    {name: "Motel Rocks", postcode: "WR4 9FA"},
+    {name: "Pointbid", postcode: "B6 7JJ"},
+    {name: "Snag Tights", postcode: "EH54 9DF"},
+    {name: "T Shirt & Sons", postcode: "BA13 4JP"},
+    {name: "UNIVERSAL TEXTILES", postcode: "LE3 1HR"},
+    {name: "Wrap Distribution", postcode: "OX10 9TA"}
+];
+
+
+// Functie pentru geocodare postcode
+function geocodeClient(client) {
+    var url = "https://nominatim.openstreetmap.org/search?format=json&country=UK&postalcode=" 
+              + client.postcode;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.length > 0) {
+                var lat = data[0].lat;
+                var lon = data[0].lon;
+
+                L.circleMarker([lat, lon], {
+                    radius: 6,
+                    fillColor: "#007bff",
+                    color: "#fff",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                })
+                .addTo(map)
+                .bindPopup("<b>" + client.name + "</b><br>" + client.postcode);
+            }
+        })
+        .catch(err => console.log(err));
 }
 
-async function calculateQuote(){
-  let pickup = document.getElementById("pickup").value;
-  let delivery = document.getElementById("delivery").value;
-  let tariff = parseFloat(document.getElementById("vehicle").value);
 
-  let p1 = await getCoords(pickup);
-  let p2 = await getCoords(delivery);
+// Adaugă toți clienții pe hartă
+clients.forEach(client => {
+    geocodeClient(client);
+});
 
-  if(!p1 || !p2){
-    alert("Address not found");
-    return;
-  }
-
-  let marker1 = L.marker(p1).addTo(map);
-  let marker2 = L.marker(p2).addTo(map);
-
-  let route = await axios.get(
-    `https://router.project-osrm.org/route/v1/driving/${p1[1]},${p1[0]};${p2[1]},${p2[0]}?overview=false`
-  );
-
-  let distanceMeters = route.data.routes[0].distance;
-  let miles = distanceMeters / 1609;
-
-  // Calculation with minimum £50
-  let baseTransport = miles * tariff;
-  let transportPrice = Math.max(baseTransport, 50);
-  let clientPrice = transportPrice * 1.05;
-
-  document.getElementById("result").innerHTML =
-    "Distance: "+miles.toFixed(2)+" miles<br>"+
-    "Transport Price: £"+transportPrice.toFixed(2)+"<br>"+
-    "Client Price: £"+clientPrice.toFixed(2);
-
-  map.fitBounds([p1,p2]);
-}
 </script>
 
 </body>
