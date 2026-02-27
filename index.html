@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Quick Quotes UK - Client Map</title>
+<title>Quick Quotes UK - Transport Cost Tool</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
@@ -15,9 +15,21 @@ html, body {
     font-family: Arial, sans-serif;
 }
 
-#map {
-    width:100%;
+#container {
+    display:flex;
     height:100vh;
+}
+
+#map {
+    flex:3;
+}
+
+#sidebar {
+    flex:1;
+    background:#f4f6f9;
+    padding:15px;
+    overflow-y:auto;
+    border-left:1px solid #ddd;
 }
 
 #searchBox {
@@ -27,31 +39,43 @@ html, body {
     transform:translateX(-50%);
     z-index:1000;
     background:white;
-    padding:10px 15px;
+    padding:12px 15px;
     border-radius:8px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.2);
+    box-shadow:0 4px 12px rgba(0,0,0,0.25);
 }
 
 input {
     padding:6px;
-    font-size:14px;
+    margin-right:5px;
 }
 
 button {
-    padding:6px 10px;
-    font-size:14px;
+    padding:6px 12px;
     cursor:pointer;
+}
+
+.highlight {
+    background:#ffe8e8;
+    font-weight:bold;
+    padding:5px;
 }
 </style>
 </head>
 <body>
 
 <div id="searchBox">
-    <input type="text" id="postcodeInput" placeholder="Enter new client postcode">
-    <button onclick="searchPostcode()">Search</button>
+    <input type="text" id="postcodeInput" placeholder="Enter collection postcode">
+    <input type="number" id="rateInput" value="1.5" step="0.1"> £ per mile
+    <button onclick="searchPostcode()">Calculate</button>
 </div>
 
-<div id="map"></div>
+<div id="container">
+    <div id="map"></div>
+    <div id="sidebar">
+        <h3>Distance & Cost</h3>
+        <div id="distanceList">Enter a postcode to calculate distances.</div>
+    </div>
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -60,13 +84,12 @@ button {
 var map = L.map('map').setView([54.5, -2.5], 6);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
+    attribution:'&copy; OpenStreetMap contributors'
 }).addTo(map);
 
 
-// Lista clienti (coordonate fixe)
+// CLIENT DATA
 var clients = [
-
 { name:"ShipBob", postcode:"CV35 9JY", lat:52.192, lng:-1.552 },
 { name:"ShipBob", postcode:"OL10 2TT", lat:53.592, lng:-2.220 },
 { name:"AJVANI SHOES", postcode:"BL1 3DX", lat:53.587, lng:-2.430 },
@@ -89,41 +112,55 @@ var clients = [
 { name:"T Shirt & Sons", postcode:"BA13 4JP", lat:51.205, lng:-2.187 },
 { name:"UNIVERSAL TEXTILES", postcode:"LE3 1HR", lat:52.636, lng:-1.168 },
 { name:"Wrap Distribution", postcode:"OX10 9TA", lat:51.606, lng:-1.125 }
-
 ];
 
+var searchMarker = null;
+var radiusCircle = null;
+var nearestLine = null;
 
-// Adaugare pinuri client
-clients.forEach(function(client){
 
+// Add client markers
+clients.forEach(client => {
     var marker = L.marker([client.lat, client.lng]).addTo(map);
-
-    marker.bindTooltip(
-        "<b>" + client.name + "</b><br>" + client.postcode,
-        { direction:"top" }
-    );
-
+    marker.bindTooltip("<b>"+client.name+"</b><br>"+client.postcode);
+    client.marker = marker;
 });
 
 
-// Marker pentru cautare
-var searchMarker = null;
+// Convert KM to Miles
+function kmToMiles(km){
+    return km * 0.621371;
+}
 
 
-// Functie geocodare postcode nou
+// Haversine distance in KM
+function getDistance(lat1, lon1, lat2, lon2) {
+    var R = 6371;
+    var dLat = (lat2-lat1) * Math.PI/180;
+    var dLon = (lon2-lon1) * Math.PI/180;
+    var a =
+        Math.sin(dLat/2)*Math.sin(dLat/2) +
+        Math.cos(lat1*Math.PI/180)*
+        Math.cos(lat2*Math.PI/180)*
+        Math.sin(dLon/2)*Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R*c;
+}
+
+
 async function searchPostcode(){
 
     var postcode = document.getElementById("postcodeInput").value;
+    var rate = parseFloat(document.getElementById("rateInput").value);
 
     if(!postcode) return;
 
     const response = await fetch(
-        "https://nominatim.openstreetmap.org/search?format=json&country=UK&postalcode=" + postcode
+        "https://nominatim.openstreetmap.org/search?format=json&country=UK&postalcode="+postcode
     );
 
     const data = await response.json();
-
-    if(data.length === 0){
+    if(data.length===0){
         alert("Postcode not found");
         return;
     }
@@ -131,22 +168,63 @@ async function searchPostcode(){
     var lat = parseFloat(data[0].lat);
     var lon = parseFloat(data[0].lon);
 
-    if(searchMarker){
-        map.removeLayer(searchMarker);
-    }
+    if(searchMarker) map.removeLayer(searchMarker);
+    if(radiusCircle) map.removeLayer(radiusCircle);
+    if(nearestLine) map.removeLayer(nearestLine);
 
-    // Marker verde pentru noul client
-    searchMarker = L.marker([lat, lon], {
+    searchMarker = L.marker([lat,lon],{
         icon: new L.Icon({
-            iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-            iconSize: [32,32],
-            iconAnchor: [16,32]
+            iconUrl:'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+            iconSize:[32,32],
+            iconAnchor:[16,32]
         })
     }).addTo(map);
 
-    searchMarker.bindTooltip("New Client<br>" + postcode, {direction:"top"}).openTooltip();
+    radiusCircle = L.circle([lat,lon],{
+        radius:80467, // 50 miles in meters
+        color:'green',
+        fillOpacity:0.05
+    }).addTo(map);
 
-    map.setView([lat, lon], 9);
+    var distances=[];
+
+    clients.forEach(client=>{
+        var km = getDistance(lat,lon,client.lat,client.lng);
+        var miles = kmToMiles(km);
+        var cost = miles * rate;
+
+        distances.push({...client, miles:miles, cost:cost});
+
+        client.marker.setIcon(new L.Icon.Default());
+    });
+
+    distances.sort((a,b)=>a.miles-b.miles);
+
+    var nearest = distances[0];
+
+    nearest.marker.setIcon(new L.Icon({
+        iconUrl:'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+        iconSize:[32,32],
+        iconAnchor:[16,32]
+    }));
+
+    nearestLine = L.polyline([[lat,lon],[nearest.lat,nearest.lng]],{
+        color:'red'
+    }).addTo(map);
+
+    var html="";
+
+    distances.forEach((c,i)=>{
+        html += "<div class='"+(i===0?"highlight":"")+"'>"+
+        c.name+" ("+c.postcode+")<br>"+
+        "Distance: "+c.miles.toFixed(1)+" miles<br>"+
+        "Estimated Cost: £"+c.cost.toFixed(2)+
+        "</div><hr>";
+    });
+
+    document.getElementById("distanceList").innerHTML=html;
+
+    map.setView([lat,lon],8);
 }
 
 </script>
